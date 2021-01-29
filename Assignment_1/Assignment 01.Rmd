@@ -1,0 +1,65 @@
+---
+output:
+  word_document: default
+  html_document: default
+---
+#Analysis of dataset in R
+##By Sabiha Mhatranaik
+
+#Load Dataset packages
+```{r}
+library(readxl)
+```
+#import the excel file into the global environment
+```{r}
+Dataset_Media_ <- read_excel("Machine Learning/Dataset_Media -.xls")
+```
+#head function gives the first 6 rows
+```{r}
+head(Dataset_Media_)
+```
+
+#tail function gives the last 6 rows 
+```{r}
+tail(Dataset_Media_)
+```
+#str function will structure the data 
+```{r}
+str(Dataset_Media_)
+```
+#summary function will give the summary of the data 
+```{r}
+summary(Dataset_Media_)
+```
+```{r}
+plot(Dataset_Media_)
+```
+#X-Y plot for two quantitative variables(Scatterplot)
+```{r}
+plot(Dataset_Media_$Audience_Size,Dataset_Media_$Preference)
+```
+#Add some Options
+```{r}
+plot(Dataset_Media_$Audience_Size,Dataset_Media_$Preference,pch=20,col="#cc0000",main="Example of Media",xlab="Size of the Audience",ylab="Preference")
+```
+#Plotting a quantitative variable Audience_Size
+```{r}
+plot(Dataset_Media_$Audience_Size)
+```
+#Lineplot,Histogram,Boxplot
+```{r}
+plot(Dataset_Media_$Audience_Size,type="l",main="Example of Media",xlab="Size of the Audience",ylab="Preference")
+hist(Dataset_Media_$Audience_Size)
+boxplot(Dataset_Media_$Audience_Size)
+```
+#Working with functions
+```{r}
+min(Dataset_Media_$Audience_Size)
+max(Dataset_Media_$Audience_Size)
+range(Dataset_Media_$Audience_Size)
+mean(Dataset_Media_$Audience_Size)
+median(Dataset_Media_$Audience_Size)
+```
+#The End
+
+
