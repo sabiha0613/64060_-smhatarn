@@ -1,0 +1,140 @@
+---
+title: "sabihaAssingment2"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+library(gmodels)
+library(dplyr)
+library(caret)
+library(FNN)
+library(psych)
+```
+
+```{r}
+my_data<-read.csv("/Users/sabihamhatarnaik/Desktop/Machine Learning/UniversalBank.csv")
+dataset=subset(my_data, select=-c(ID, ZIP.Code ))
+dummy_Education=as.data.frame(dummy.code(dataset$Education))
+names(dummy_Education)<- c("Education_1", "Education_2","Education_3")##rename dummy variables
+dataset_noEducation<- subset(dataset, select=-c(Education))##Eliminate education variable
+UniversalBank<-cbind(dataset_noEducation,dummy_Education)
+set.seed(100)
+#Partitioning the data into Traning(60%) and Validation(40%)
+Index_Train<-createDataPartition(UniversalBank$Age, p= 0.6 , list=FALSE)
+Train<-UniversalBank[Index_Train,]
+Validation<-UniversalBank[-Index_Train,]
+summary(Train)
+dim(Train)
+summary(Validation)
+dim(Validation)
+#Creating test data
+Test_Data <- data.frame(Age=40 , Experience=10, Income = 84, Family = 2, CCAvg = 2, Education_1 = 0, Education_2 = 1, Education_3 = 0, Mortgage = 0, Securities.Account = 0, CD.Account = 0, Online = 1,  CreditCard = 1, stringsAsFactors = FALSE)
+#Data Normalization
+train_norm_dataset<- Train
+head(train_norm_dataset)
+valid_norm_dataset<- Validation
+head(valid_norm_dataset)
+test_norm_dataset<-Test_Data
+head(test_norm_dataset)
+Total_norm_dataset<- UniversalBank
+head(Total_norm_dataset)
+norm_val<- preProcess(Train[,-7], method=c("center", "scale"))
+head(norm_val)
+train_norm_dataset[,-7]<-predict(norm_val,Train[,-7])#training data
+head(train_norm_dataset)
+valid_norm_dataset[,-7]<-predict(norm_val,Validation[,-7])#validation data
+head(valid_norm_dataset)
+test_norm_dataset<-predict(norm_val,Test_Data)
+head(test_norm_dataset)
+Total_norm_dataset[,-7]<-predict(norm_val,UniversalBank[,-7])##training and validation
+head(Total_norm_dataset)
+##creating factors
+Train$Personal.Loan<-factor(Train$Personal.Loan,levels=c(0,1),labels=c("deny","accept"))
+head(Train)
+Validation$Personal.Loan<-factor(Validation$Personal.Loan,levels=c(0,1),labels=c("deny","accept"))
+head(Validation)
+##Q1.Perform a k-NN classification with all predictors except ID and ZIP code using k = 1.
+##Remember to transform categorical predictors with more than two categories into dummy
+##variables first. Specify the success class as 1 (loan acceptance), and use the default cutoff value of
+##0.5. How would this customer be classified?
+set.seed(100)
+prediction <- knn(train=train_norm_dataset[,-7],test=valid_norm_dataset[,-7],cl=train_norm_dataset[,7] , k = 1, prob=TRUE) 
+actual= valid_norm_dataset$Personal.Loan
+class_prob = attr(prediction,"prob")
+table(prediction,actual)  
+mean(prediction==actual)
+NROW(train_norm_dataset)
+sqrt(3001)
+#Q2.What is a choice of k that balances between overfitting and ignoring the predictor information?
+library(caret)
+Best_k <- data.frame(k = seq(1, 55, 1), accuracy = rep(0,55 ))
+for(i in 1:55) 
+{
+  prediction <- knn(train = train_norm_dataset[,-7], test = valid_norm_dataset[-7],cl = train_norm_dataset[,7], k = i, prob=TRUE) 
+  Best_k[i,2] <- mean(prediction==actual)
+}
+Best_k
+####Validation data results using best k value [ k = 3]
+#library(FNN)
+set.seed(2019)
+prediction <- knn(train = train_norm_dataset[,-7], test = valid_norm_dataset[,-7], cl = train_norm_dataset[,7], k = 3, prob=TRUE) 
+actual= valid_norm_dataset$Personal.Loan
+prediction_prob = attr(prediction,"prob")
+table(prediction,actual)  
+#accuracy of the best k=3
+mean(prediction==actual)  
+## Q3.confusion matrix for best k=3
+library(FNN)
+con_max<-knn(train=train_norm_dataset[,-7],test=valid_norm_dataset[,-7],cl=Train$Personal.Loan,k=3,prob=TRUE)
+CrossTable(x=valid_norm_dataset$Personal.Loan,y=con_max,prop.chisq = FALSE)
+#### Q4Classifying the customer using the best k  [perfominng k-NN classification on test data]
+#library(FNN)
+predict_test <- knn(train = Total_norm_dataset[,-7], test = Test_Data, cl = Total_norm_dataset[,7], k = 1, prob=TRUE) 
+head(predict_test)
+##Q5.Repartition the data, this time into training, validation, and test sets (50% : 30% : 20%)
+Index1_Train <- createDataPartition(UniversalBank$Age,p=0.5, list=FALSE) 
+Train1 = UniversalBank[Index1_Train,]
+leftover = UniversalBank[-Index1_Train,]
+head(leftover)
+Index1_Validation<- createDataPartition(leftover$Age,p=0.6, list=FALSE)
+Validation1 = leftover[Index1_Validation,]
+dim(Validation1)
+#Index1_Test <- createDataPartition(UniversalBank$Age,p=0.2, list=FALSE)
+Test1 = leftover[-Index1_Validation,]
+dim(Test1)
+## normalization
+Train_norm_dataset1<-Train1
+Validate_norm_dataset1<-Validation1
+Test_norm_dataset1<-Test1
+norm_val1<-preProcess(Train1[,-7],method=c("center","scale"))
+Train_norm_dataset1[,-7]<-predict(norm_val1,Train1[,-7])
+summary(Train_norm_dataset1)
+Validate_norm_dataset1[,-7]<-predict(norm_val1,Validation1[,-7])
+summary(Validate_norm_dataset1)
+Test_norm_dataset1[,-7]<-predict(norm_val1,Test1[-7])
+##creating levels for personal loan
+Train1$Personal.Loan<-factor(Train1$Personal.Loan,levels = c(0,1),labels = c("deny","accept"))
+Validation1$Personal.Loan<-factor(Validation1$Personal.Loan,levels = c(0,1),labels = c("deny","accept"))
+Test1$Personal.Loan<-factor(Test1$Personal.Loan,levels = c(0,1),labels = c("deny","accept"))
+## KNN Modelling for TRAINING set ##
+library(FNN)
+KNN_Train<-knn(train=Train_norm_dataset1[,-7],test=Train_norm_dataset1[,-7],cl=Train1$Personal.Loan,k=3,prob=TRUE)
+head(KNN_Train)
+library(gmodels)
+CrossTable(x=Train1$Personal.Loan,y=KNN_Train,prop.chisq = FALSE)
+## KNN Modelling for VALIDATION set ##
+library(FNN)
+KNN_Validation<-knn(train=Train_norm_dataset1[,-7],test=Validate_norm_dataset1[,-7],cl=Train1$Personal.Loan,k=3,prob=TRUE)
+head(KNN_Validation)
+library(gmodels)
+CrossTable(x=Validation1$Personal.Loan,y=KNN_Validation,prop.chisq = FALSE)
+## KNN Modelling for TEST set ##
+library(FNN)
+KNN_TEST<-knn(train=Train_norm_dataset1[,-7],test=Test_norm_dataset1[,-7],cl=Train1$Personal.Loan,k=3,prob=TRUE)
+head(KNN_TEST)
+library(gmodels)
+CrossTable(x=Test1$Personal.Loan,y=KNN_TEST,prop.chisq = FALSE)
+```
+#We got an accuracy for test data =0.9528
+#We got an accuracy for validation data =0.9593
+#As KNN model is applied to diferent dataset we get difference in accuracy.The biasness is basically due to attribute that is chosen to partition the dataset
