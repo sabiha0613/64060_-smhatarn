@@ -1,0 +1,363 @@
+---
+title: "Final Exam"
+author: "SABIHA MHATARNAIK"
+date: "5/7/2021"
+output:
+  word_document: default
+  html_document:
+    df_print: paged
+  pdf_document: default
+---
+
+####Problem Statement
+
+
+CRISA has traditionally segmented markets on the basis of purchaser demographics. They would now like to segment the market based on two key sets of variables more directly related to the purchase process and to brand loyalty:
+
+1. Purchase behavior (volume, frequency, susceptibility to discounts, and brand loyalty)
+
+2. Basis of purchase (price, selling proposition)
+
+Doing so would allow CRISA to gain information about what demographic attributes are associated with different purchase behaviors and degrees of brand loyalty, and thus deploy promotion budgets more effectively. More effective market segmentation would enable CRISA’s clients (in this case, a firm called IMRB) to design more cost-effective promotions targeted at appropriate segments. Thus, multiple promotions could be launched, each targeted at different market segments at different times of the year. This would result in a more cost-effective allocation of the promotion budget to different market segments. It would also enable IMRB to design more effective customer reward systems and thereby increase brand loyalty.
+
+QUESTIONS:
+
+1. Use k-means clustering to identify clusters of households based on:
+a. The variables that describe purchase behavior (including brand loyalty)
+b. The variables that describe the basis for purchase
+c. The variables that describe both purchase behavior and basis of purchase
+Note 1: How should k be chosen? Think about how the clusters would be used. It is likely that the marketing efforts would support two to five different promotional approaches. Note 2: How should the percentages of total purchases comprised by various brands be treated? Isn’t a customer who buys all brand A just as loyal as a customer who buys all brand B? What will be the effect on any distance measure of using the brand share variables as is? Consider using a single derived variable.
+2. Select what you think is the best segmentation and comment on the characteristics (demographic, brand loyalty, and basis for purchase) of these clusters. (This information would be used to guide the development of advertising and promotional campaigns.)
+3. Develop a model that classifies the data into these segments. Since this information would most likely be used in targeting direct-mail promotions, it would be useful to select a market segment that would be defined as a success in the classification model.
+
+
+
+####Libraries Used
+```{r, message=FALSE}
+library(dplyr)      #for conversion of %columns to numeric variables for calculations
+library(factoextra) #for clustering algorithms & visualization
+library(ggplot2)    #visualization
+library(GGally)     #graph
+library(mcclust)    #modeling clusters
+```
+
+#Importing dataset in R
+```{r}
+data <- read.csv("BathSoap.csv")
+sum(is.na(data)) #To check missing values
+```
+#Data Transformation
+```{r}
+#Duplicating the dataset and then using it further for transformation and analysis 
+my_data <- data
+
+#Converting the % data to decimal form
+my_data[ ,20:46] <- apply(my_data[ ,20:46],2,function(x) {as.numeric(sub("%", "",x,fixed=TRUE))/100})
+
+
+#Converting variables to factors
+my_data[,c(1:10,12)] <- lapply(my_data[,c(1:10,12)], factor)
+
+#Giving row number as the name of " Member Id "  and then eliminating the variable name from the dataset to avoid redundency 
+rownames(my_data) <- my_data$Member.id
+my_data$Member.id = NULL
+```
+
+#1. Kmeans Clustering to identify clusters of households based on:
+
+##A. Purchase Behavior (including brand loyalty)
+###I. Variables that describes purchase behavior:
+#Brand Runs, Total Volume, No. of Trans, Value, Trans/ Brand Runs, Vol/Trans, Avg. Price,Pur Vol No Promo
+
+###II. Brand Loyalty: 
+#Br. Cd. 57, 144,Br. Cd. 55,Br. Cd. 272,Br. Cd. 286,Br. Cd. 24,Br. Cd. 481,Br. Cd. 352,Br. Cd. 5,Others 999
+```{r}
+PurchaseBehavior_Data <- my_data[,c("Brand.Runs","Total.Volume", "No..of..Trans","Value","Trans...Brand.Runs","Vol.Tran","Avg..Price", "Pur.Vol.No.Promo....","Br..Cd..57..144","Br..Cd..55","Br..Cd..272","Br..Cd..286", "Br..Cd..24","Br..Cd..481","Br..Cd..352","Br..Cd..5", "Others.999")]
+#Normalizing the dataset 
+PurchaseBehavior_Data <- as.data.frame(scale(PurchaseBehavior_Data))
+sum(is.na(PurchaseBehavior_Data))
+```
+
+##Determining K value
+```{r}
+#Elbow Method for finding the optimal number of clusters
+set.seed(123)
+k.max <- 10
+DATA1 <- PurchaseBehavior_Data
+wss <- sapply(1:k.max, 
+              function(k){kmeans(DATA1, k, nstart=25,iter.max = 15 )$tot.withinss})
+wss
+plot(1:k.max, wss,
+     type="b", pch = 19, frame = FALSE, 
+     xlab="Number of clusters K",
+     ylab="Total within-clusters sum of squares")
+```
+
+As a result, the between ss/total ss ratio for k=3 continues to shift slowly and stay stable relative to other k's. As a result, k=3 should be a reasonable number of clusters for this results.
+
+```{r}
+set.seed(123)
+#K-means 
+KMeans1 <- kmeans(PurchaseBehavior_Data, centers = 3, nstart = 25)
+KMeans1$centers   #centers of clusters
+KMeans1$size      #size of each clusters
+#Store the cluster assigned to the dataset
+PurchaseBehavior_Data <- as.data.frame(cbind(KMeans1$cluster, PurchaseBehavior_Data))
+colnames(PurchaseBehavior_Data)[1] <- "cluster"
+#Converting the cluster to a factor 
+PurchaseBehavior_Data$cluster <- as.factor(PurchaseBehavior_Data$cluster)
+```
+
+```{r}
+# Plot
+fviz_cluster(KMeans1, data = PurchaseBehavior_Data[ , -c(1)])
+```
+
+```{r}
+#Creating a new column "High Brand Value Name" that finds the highest value of all the rows and prints the name of the column it refers to in the new variable.
+DataSet <- data.frame(my_data[,c(22:30)])
+PurchaseBehavior_Data$High_Brand_Value_Name <- colnames(DataSet)[apply(DataSet,1,which.max)]
+# Ploting graph by Brand Name
+ggplot(data = PurchaseBehavior_Data) +
+  geom_bar(mapping = aes(PurchaseBehavior_Data$High_Brand_Value_Name), 
+           col = "blue4",
+           fill = "black") +
+  facet_wrap(vars(PurchaseBehavior_Data$cluster)) +
+  labs(title = "Count of 'Hosueholders' as per 'Cluster' in relation to 'Brand'") +
+  labs(x = "Brand Names", y = "Count") +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1),plot.title = element_text(hjust = 0.5))
+```
+
+#B. Basis of Purchase
+
+#*Variables used: Pur Vol No Promo-%, \rlapPur Vol Promo 6%, Pur Vol Other Promo %, Price Cat 1 to 4, Proposition Cat 5 to 15
+
+```{r}
+Purchase_Basis_data <- my_data[,c("Pur.Vol.No.Promo....","Pur.Vol.Promo.6..", "Pur.Vol.Other.Promo..","Pr.Cat.1" ,"Pr.Cat.2","Pr.Cat.3","Pr.Cat.4", "PropCat.5","PropCat.6" ,"PropCat.7","PropCat.8","PropCat.9","PropCat.10","PropCat.11","PropCat.12","PropCat.13","PropCat.14","PropCat.15"          
+)]
+#Data Normalization
+Purchase_Basis_data <- as.data.frame(scale(Purchase_Basis_data))
+```
+
+#####Determining the value of K
+```{r}
+#Elbow Method for finding the optimal number of clusters
+set.seed(123)
+k.max <- 10
+DATA2 <- Purchase_Basis_data
+wss <- sapply(1:k.max, 
+              function(k){kmeans(DATA2, k, nstart=25,iter.max = 15 )$tot.withinss})
+wss
+plot(1:k.max, wss,
+     type="b", pch = 19, frame = FALSE, 
+     xlab="Number of clusters K",
+     ylab="Total within-clusters sum of squares")
+```
+
+#As a result, the between ss/total ss ratio for k=3 continues to shift slowly and stay stable relative to other k's. As a result, k=3 should be a reasonable number of clusters for this results.
+
+```{r}
+set.seed(123)
+#k-means 
+KMeans2 <- kmeans(Purchase_Basis_data, centers = 3, nstart = 25)
+#size of each cluster
+KMeans2$centers
+KMeans2$size
+#Store the cluster assigned to the dataset
+Purchase_Basis_data <- as.data.frame(cbind(KMeans2$cluster, Purchase_Basis_data))
+colnames(Purchase_Basis_data)[1] <- "cluster"
+#Converting the cluster to a factor 
+Purchase_Basis_data$cluster <- as.factor(Purchase_Basis_data$cluster)
+```
+
+```{r}
+# Plots of the variables
+fviz_cluster(KMeans2, data = Purchase_Basis_data[ , -c(1)])
+```
+
+```{r}
+# Plot by Brand Name
+ggplot(data = Purchase_Basis_data) +
+  geom_bar(mapping = aes(PurchaseBehavior_Data$High_Brand_Value_Name), 
+           col = "blue4",
+           fill = "black") +
+  facet_wrap(vars(Purchase_Basis_data$cluster)) +
+  labs(title = "Count of 'Hosueholders' as per 'Cluster' in relation to 'Brand'") +
+  labs(x = "Brand Names", y = "Count") +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1),plot.title = element_text(hjust = 0.5))
+```
+
+####c. Purchase Behaviour & Basis of Purchase
+
+#I. Variables that describes "Purchase behavior":
+#  Brand Runs, Total Volume, No. of Trans, Value, Trans/ Brand Runs, Vol/Trans, Avg. Price,Pur #Vol,Br.Cd.\rlap(57,144),55,272,286,24,481,352,5,and 999(others)
+
+#II. Variables that describe "Basis of "Purchase":
+#Pur Vol No Promo-%, \rlapPur Vol Promo 6%, Pur Vol Other Promo %, Price Cat 1 to 4, Proposition #Cat 5 to 15
+
+```{r}
+PurchaseBehaviour_n_PurchaseBasis<- my_data[,c("Brand.Runs","Total.Volume", "No..of..Trans","Value","Trans...Brand.Runs","Vol.Tran","Avg..Price", "Pur.Vol.No.Promo....", "Br..Cd..57..144","Br..Cd..55","Br..Cd..272","Br..Cd..286", "Br..Cd..24","Br..Cd..481", "Br..Cd..352","Br..Cd..5","Others.999","Pur.Vol.No.Promo....","Pur.Vol.Promo.6..", "Pur.Vol.Other.Promo..","Pr.Cat.1" ,"Pr.Cat.2","Pr.Cat.3","Pr.Cat.4", "PropCat.5","PropCat.6" ,"PropCat.7","PropCat.8","PropCat.9","PropCat.10","PropCat.11","PropCat.12","PropCat.13","PropCat.14","PropCat.15")]
+
+PurchaseBehaviour_n_PurchaseBasis <- as.data.frame(scale(PurchaseBehaviour_n_PurchaseBasis))
+```
+
+#####Determining the value of K
+
+```{r}
+#Elbow Method for finding the optimal number of clusters
+set.seed(123)
+k.max <- 10
+DATA3 <- PurchaseBehaviour_n_PurchaseBasis
+wss <- sapply(1:k.max, 
+              function(k){kmeans(DATA3, k, nstart=25,iter.max = 15 )$tot.withinss})
+wss
+plot(1:k.max, wss,
+     type="b", pch = 19, frame = FALSE, 
+     xlab="Number of clusters K",
+     ylab="Total within-clusters sum of squares")
+```
+
+#As a result, the between ss/total ss ratio for k=3 continues to shift slowly and stay stable relative to other k's. As a result, k=3 should be a reasonable number of clusters for this results.
+
+```{r}
+set.seed(123)
+#K-means 
+KMeans3 <- kmeans(PurchaseBehaviour_n_PurchaseBasis, centers = 3, nstart = 25)
+#size of each cluster
+KMeans3$centers
+KMeans3$size
+#Store the cluster assigned to the dataset
+PurchaseBehaviour_n_PurchaseBasis <- as.data.frame(cbind(KMeans3$cluster, PurchaseBehaviour_n_PurchaseBasis))
+colnames(PurchaseBehaviour_n_PurchaseBasis)[1] <- "cluster"
+#Converting the cluster to a factor 
+PurchaseBehaviour_n_PurchaseBasis$cluster <- as.factor(PurchaseBehaviour_n_PurchaseBasis$cluster)
+```
+
+```{r}
+# Ploting variables
+fviz_cluster(KMeans3, data = PurchaseBehaviour_n_PurchaseBasis[ , -c(1)])
+```
+
+```{r}
+# Ploting graph by Brand Name
+ggplot(data = PurchaseBehaviour_n_PurchaseBasis) +
+  geom_bar(mapping = aes(PurchaseBehavior_Data$High_Brand_Value_Name), 
+           col = "blue4",
+           fill = "black") +
+  facet_wrap(vars(PurchaseBehaviour_n_PurchaseBasis$cluster)) +
+  labs(title = "Count of 'Hosueholders' as per 'Cluster' in relation to 'Brand'") +
+  labs(x = "Brand Names", y = "Count") +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1),plot.title = element_text(hjust = 0.5))
+```
+
+###2. Market Segmentation
+
+#*As per the analysis of characteristics (demographic, brand loyalty and basis of purchase) the best segmentation is the third one where we consider both the aspects i.e purchase behaviour (brand loyalty) and basis of purchase.
+
+#*To get the result/s of the other variable/s we need to replace the CS variable name to the respective variable we want to do visualization on.
+```{r}
+
+#Ploting graph by "CS":- Telivision Avaibiity
+# Purchase Behaviour Data
+ggplot(data = PurchaseBehavior_Data) +
+  geom_bar(mapping = aes(my_data$CS), 
+           col = "blue4",
+           fill = "black") +
+  facet_wrap(vars(PurchaseBehavior_Data$cluster)) +
+  labs(title = "Telivison Avaibility- Purchase Behaviour") +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1),plot.title = element_text(hjust = 0.5))
+```
+
+```{r}
+# Purchase Basis Data
+ggplot(data = Purchase_Basis_data) +
+  geom_bar(mapping = aes(my_data$CS), 
+           col = "blue4",
+           fill = "black") +
+  facet_wrap(vars(Purchase_Basis_data$cluster)) +
+  labs(title = "Telivision Avaibility- Purchase Basis") +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1),plot.title = element_text(hjust = 0.5))
+```
+
+```{r}
+#Analysis:
+#Ploting graph by "CS":- Telivision Avaibiity
+#Behaviour & Basis Data
+ggplot(data = PurchaseBehaviour_n_PurchaseBasis) +
+  geom_bar(mapping = aes(my_data$CS), 
+           col = "blue4",
+           fill = "black") +
+  facet_wrap(vars(PurchaseBehaviour_n_PurchaseBasis$cluster)) +
+  labs(title = "Telivision Avaibility- Behaviour & Basis") +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1), plot.title = element_text(hjust = 0.5))
+```
+
+```{r}
+##Insights on Demographics:
+Demographics_data = cbind(data, Cluster =PurchaseBehaviour_n_PurchaseBasis$cluster)
+aggregate_data = aggregate(cbind(SEC, FEH, MT, SEX, AGE, EDU, HS, CHILD, CS,
+Affluence.Index) ~ Cluster, data = Demographics_data, mean, na.rm = FALSE)
+```
+
+Analysis:
+  1. Based on the chart's observations/visuals, we can deduce that "Others 999" is the most common brand name in Clusters 1 and 2.
+  
+  2.More extensive data collection is needed to determine if the "Other 999" brand has any secret patterns. Whether it has a larger number of customers within the same brand than the competition.
+  
+  3.Clusters 1 and 2 have the largest percentages of households with televisions. This may be one of the reasons that more people in the same cluster have a lot of "Other 999" brand items. They must have seen a commercial on television that enticed them to try a different product than normal.
+  
+  4.The 'CS' variable, which refers to Telivision availability, has zero in it. As a result, many homeowners have not responded to the survey. As a result, there's a chance that I'll miss out on crucial details. As a result, detailed questions relating to variables should be made obligatory to answer.
+  
+  5.Cluster 3 has the highest level of socioeconomic status, and it has a high level of brand loyalty to "Br..Cd..55." There's a chance that the food is pricey and serves as a status statement in society.
+  
+  6.Cluster 3 has the lowest Affluence Index, perhaps because the householders have children and their earnings will be spent on tuition, health, insurance, schooling, and other expenses, implying that they do not have any income or savings.
+
+
+###3. Classification Model
+
+#*I. Method: k means clustering for classification model
+
+#*II. Variables used:"Pur.Vol.No.Promo....","Pur.Vol.Promo.6..","Pur.Vol.Other.Promo.."
+```{r}
+#Building model based on 3 variables.
+Classification_Model<-my_data[,c(19:21)]
+Classification_Model_Scaled<-as.data.frame(scale(Classification_Model))
+set.seed(123)
+fviz_nbclust(Classification_Model_Scaled, kmeans, method = "wss") +
+  labs(title = "Optimal Number of Clusters - Elbow Method") 
+fviz_nbclust(Classification_Model_Scaled, kmeans, method = "silhouette") +
+  labs(title = "Optimal Number of Clusters - Silhouette Method")
+#K-means for classification model
+set.seed(123)
+km_class <- kmeans(Classification_Model_Scaled, centers =2 , nstart = 100) #k=2
+#plotting k-means model
+fviz_cluster(km_class, data = Classification_Model_Scaled, main="Promotion characteristics", 
+             xlab = FALSE,ylab = FALSE,palette = "Set2", ggtheme = theme_minimal())
+#Store the cluster assigned to the dataset
+Classification_Model_Scaled <- as.data.frame(cbind(km_class$cluster, Classification_Model_Scaled))
+colnames(Classification_Model_Scaled)[1] <- "cluster"
+#Converting the cluster to a factor 
+Classification_Model_Scaled$cluster <- as.factor(Classification_Model_Scaled$cluster)
+# Plot on basis of Promotion
+ggplot(data = Classification_Model_Scaled) +
+  geom_bar(mapping = aes(PurchaseBehavior_Data$High_Brand_Value_Name), 
+           col = "blue4",
+           fill = "black") +
+  facet_wrap(vars(Classification_Model_Scaled$cluster)) +
+  labs(title = "Count of 'Hosueholders' as per 'Cluster' in relation to 'Promotion'") +
+  labs(x = "Brand Names", y = "Count") +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1),plot.title = element_text(hjust = 0.5))
+```
+Conclusion:
+
+-->Brand Loyal residents can be found in Cluster 2. If we have discounts or deals, cluster 1 householders should be our target demographic because they are price sensitive and could be future customers.
+
+
+-->As a result, instead of spending time on cluster 2, it is recommended to aim direct mail deals to consumers from other clusters.
+
+-->Other clusters are at differences with each other. They react well to promotions, and if given the opportunity, some potential customers can switch to brandloyal.
+
+
+
+
+
